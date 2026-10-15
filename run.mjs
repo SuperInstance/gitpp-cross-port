@@ -30,6 +30,13 @@ function runSync(cmd, args, opts = {}) {
 }
 
 const runners = {
+  c: async (records, at) => {
+    const INP = "./_input_c.json";
+    writeFileSync(INP, JSON.stringify(records));
+    const out = runSync("./ports/c/gitpp", [INP, "--at", at]);
+    const j = JSON.parse(out);
+    return j.closureRoot;
+  },
   py: async (records, at) => {
     writeFileSync(INP, JSON.stringify(records));
     const out = runSync("python3", ["./ports/python/gitpp_doctor.py", "explain", INP, "--at", at]);
@@ -58,7 +65,7 @@ const runners = {
   }
 };
 
-const ports = ["py", "js", "cs", "pl"];
+const ports = ["c", "py", "js", "cs", "pl"];
 const live = await fetchLive();
 
 const cases = [];
