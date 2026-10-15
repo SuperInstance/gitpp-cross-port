@@ -8,10 +8,11 @@ This is a permanent artifact of the [git.pp fold ports](../git.pp-spec) ecosyste
 
 | Port | Lang | Stdlib only | Source |
 |------|------|-------------|--------|
+| **C** (7th) | C99 | yes | [SuperInstance/gitpp-c](https://github.com/SuperInstance/gitpp-c) |
 | **Python** (referee) | Python 3 | yes | [git.pp-ng/referee/](https://github.com/patchwork-quilt/git.pp-ng/tree/main/referee) |
-| **JavaScript** | JS (ESM) | yes | [SuperInstance/gitpp-js](https://github.com/SuperInstance/gitpp-js) |
-| **C#** | C# / .NET 9 | yes | [SuperInstance/gitpp-cs](https://github.com/SuperInstance/gitpp-cs) |
-| **Perl** | Perl 5.36 | yes | [SuperInstance/gitpp-pl](https://github.com/SuperInstance/gitpp-pl) |
+| **JavaScript** (4th) | JS (ESM) | yes | [SuperInstance/gitpp-js](https://github.com/SuperInstance/gitpp-js) |
+| **C#** (5th) | C# / .NET 9 | yes | [SuperInstance/gitpp-cs](https://github.com/SuperInstance/gitpp-cs) |
+| **Perl** (6th) | Perl 5.36 | yes | [SuperInstance/gitpp-pl](https://github.com/SuperInstance/gitpp-pl) |
 
 All 4 ports are written from the spec v0.3.0 alone (doc-only discipline: zero reads of the other ports). They diverge only in the implementation language; the byte output of the fold is identical.
 
@@ -27,7 +28,7 @@ Requires: Node 22+, Python 3, .NET 9, Perl 5.36. The runner spawns each port's C
 
 ```
 $ node run.mjs
-Running 30 cases across 4 ports (python, javascript, csharp, perl)...
+Running 30 cases across 5 ports (c, python, javascript, csharp, perl)...
 
 Agreement: 30 all-agree, 0 disagree, 0 some-error
 ```
@@ -67,6 +68,10 @@ This cross-port test has caught (and the maintainers have fixed) several real bu
 7. **`GetRawText()` for JsonValueKind.Number** returns the literal input bytes (`1e-5`), not the canonical form. Fix: `TryGetInt64 / NumFormat(je.GetDouble())`.
 8. **Integers formatted as `1.0`** via `ToString("F1")`. Spec says integer digits. Fix: `(long)v.ToString()` for integer-valued floats.
 
+### gitpp-c (7th port) had 1 bug
+
+9. **Heap-use-after-free in closure_root.** The `closure_set` array was freed before being read in the output loop. C is the only language where this would crash — Python/JS/Perl have GC. Fix: copy the strings before freeing the array.
+
 ### All ports: integer vs float distinction
 
 The spec implicitly requires: integer literals in JSON should encode as `1` (no decimal). JavaScript doesn't distinguish int from float, so `JSON.parse("1")` gives the number `1` (a float). `String(1)` gives `"1"`, which is what Python's `repr(1)` gives. The JS port now uses `String(v)` for `Number.isInteger(v)`, matching Python's behavior.
@@ -84,6 +89,7 @@ For a fold, this matters because:
 
 - **Performance.** This is a byte-equivalence test, not a benchmark. For benchmarks, see [SuperInstance/gitpp-bench](https://github.com/SuperInstance/gitpp-bench).
 - **The TypeScript hub or the Elixir port.** Those are tested by their own test suites. Adding them here would require either running them on the conformance cases (the hub doesn't have a programmatic `/derive` endpoint that takes arbitrary record sets) or pulling them into a different harness.
+- **The Rust port.** Scaffolded at [SuperInstance/gitpp-rust](https://github.com/SuperInstance/gitpp-rust) but not implemented (no cargo in the writing sandbox).
 
 ## Pass criterion
 
