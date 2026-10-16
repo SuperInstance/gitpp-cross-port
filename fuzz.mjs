@@ -55,23 +55,23 @@ const runners = {
     writeFileSync(`${tmpDir}/_py_in.json`, "[" + recordJson + "]");
     const r = spawnSync("python3", ["-c", `
 import sys, json
-sys.path.insert(0, '/tmp/git.pp-doctor-clone')
+import os; sys.path.insert(0, os.environ.get('GITPP_DOCTOR_DIR', '/tmp/gitpp-doctor'))
 import gitpp_doctor
 record = json.load(open('${tmpDir}/_py_in.json'))[0]
 print(gitpp_doctor.record_leaf(record))
-`], { encoding: "utf8", timeout: 60000 });
+`], { encoding: "utf8", timeout: 60000, env: process.env });
     if (r.status !== 0) throw new Error(r.stderr || r.stdout);
     return r.stdout.trim();
   },
   js: async (recordJson) => {
     writeFileSync(`${tmpDir}/_js_in.json`, "[" + recordJson + "]");
     const r = spawnSync("node", ["-e", `
-import("/tmp/gitpp-js-clone/src/gitpp.js").then(async (mod) => {
+import(process.env.GITPP_JS || "/tmp/gitpp-js/src/gitpp.js").then(async (mod) => {
   const fs = await import("node:fs");
   const records = JSON.parse(fs.readFileSync("${tmpDir}/_js_in.json", "utf8"));
   console.log(await mod.recordLeaf(records[0]));
 });
-`], { encoding: "utf8", timeout: 60000 });
+`], { encoding: "utf8", timeout: 60000, env: process.env });
     if (r.status !== 0) throw new Error(r.stderr || r.stdout);
     return r.stdout.trim();
   },
