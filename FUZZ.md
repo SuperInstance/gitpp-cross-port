@@ -5,13 +5,15 @@ the same SHA-256 leaf.
 
 ## Latest results
 
-**500/500 records agree** across Python, JS, C, C#, Perl.
+**1000/1000 records agree** across Python, JS, C, C#, Perl.
 - **0 disagreements**
 - **0 errors**
-- **162.1s elapsed** (with cold dotnet build, 0.32s/record)
+- **324.9s elapsed** (with cold dotnet build, 0.32s/record)
 
-The 17,004-record full corpus is in progress; the 500-record
-subset already exercises every code path that previously failed.
+The 17,004-record full corpus can be run via:
+```bash
+node fuzz.mjs /path/to/records.json
+```
 
 ## What it tests
 
@@ -29,20 +31,19 @@ identically across ports. Edge cases exercised by the random corpus:
 - Negative values, `1e-5`, `2.5e-7`, `-0.0` (the §3.5 splitters)
 - The 4 pinned §3.5 cases (`a`, `b`, `c`, `🚀`)
 
-## What was fixed (round 4)
+## What was fixed (rounds 4-5)
 
-All 5 ports had different integer-form limits, causing disagreement
-on values 1e16–1e21 and on JSON numbers that look like integers
-to Perl's regex but are not:
+All 5 ports had different integer-form limits and 17-digit-integer
+fallback behavior, causing disagreement on values 1e16–1e21:
 - **Spec §3**: `|v| < 1e21` → `|v| < 1e16` (int64 safe)
 - **Python** (git.pp-doctor): `int(v)` only if `|v| < 1e16`
 - **JS** (gitpp-js): `Number.isInteger(v) && |v| < 1e16`
-- **C** (gitpp-c): integer check `< 1e16`
-- **C#** (gitpp-cs): `NumFormat` integer check `< 1e16`, 
-  `SciFormat` does 15/16/17 fallback (was hard-coded `e15`)
-- **Perl** (gitpp-pl): integer check `< 1e16`, sci trigger `1e16` 
-  (was `1e17`); check uses `== int($v)` not regex (so JSON::PP's
-  rounded doubles don't slip through)
+- **C** (gitpp-c): integer check `< 1e16`, 15/16/17 fallback excludes
+  integer form when `|v| >= 1e16`, uses 16-digit scientific with
+  trailing zero strip
+- **C#** (gitpp-cs): same fixes
+- **Perl** (gitpp-pl): integer check `< 1e16`, same 15/16/17 fallback
+  fix; integer check uses `== int($v)` not regex
 
 ## How to run
 
@@ -53,12 +54,12 @@ python3 generate.py > /tmp/gitpp-fuzz/records.json
 # Or a smaller subset
 python3 -c "
 import json
-records = json.load(open('/tmp/gitpp-fuzz/records.json'))[:500]
-json.dump(records, open('/tmp/gitpp-fuzz/records-500.json', 'w'))
+records = json.load(open('/tmp/gitpp-fuzz/records.json'))[:1000]
+json.dump(records, open('/tmp/gitpp-fuzz/records-1k.json', 'w'))
 "
 
 # Run the fuzz
-node fuzz.mjs /tmp/gitpp-fuzz/records-500.json
+node fuzz.mjs /tmp/gitpp-fuzz/records-1k.json
 
 # Or the full corpus (takes ~90 minutes for cold dotten per record)
 node fuzz.mjs /tmp/gitpp-fuzz/records.json
