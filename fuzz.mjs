@@ -3,6 +3,7 @@
 // Reads records as raw text (NOT via JSON.parse) to preserve float64 precision.
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const recordsText = readFileSync(process.argv[2], "utf8");
@@ -37,7 +38,17 @@ for (const s of recordJsonStrings) {
   recordIds.push(m ? m[1] : "?");
 }
 
-const tmpDir = "/tmp/gitpp-fuzz";
+// Per-RUN scratch directory. The previous version wrote to a fixed
+// /tmp/gitpp-fuzz/_py_in.json and _js_in.json. Two runs in the same sandbox
+// (or a run overlapping a leftover process) then read each other's payloads,
+// and the runner reported dozens of phantom disagreements that vanish on a
+// clean re-run. A conformance test that cries wolf gets ignored; give every
+// run its own directory.
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+const ROOT = new URL(".", import.meta.url).pathname.replace(/\/$/, "");
+const tmpDir = mkdtempSync(join(tmpdir(), "gitpp-fuzz-"));
+process.on("exit", () => { try { rmSync(tmpDir, { recursive: true, force: true }); } catch {} });
 
 const runners = {
   py: async (recordJson) => {
@@ -65,7 +76,7 @@ import("/tmp/gitpp-js-clone/src/gitpp.js").then(async (mod) => {
     return r.stdout.trim();
   },
   cs: async (recordJson) => {
-    const r = spawnSync("dotnet", [`${tmpDir}/CsLeaf/bin/Debug/net9.0/CsLeaf.dll`], {
+    const r = spawnSync("dotnet", [join(ROOT, "CsLeaf/bin/Debug/net9.0/CsLeaf.dll")], {
       input: "[" + recordJson + "]",
       encoding: "utf8",
       timeout: 60000,
@@ -75,7 +86,7 @@ import("/tmp/gitpp-js-clone/src/gitpp.js").then(async (mod) => {
     return r.stdout.trim();
   },
   pl: async (recordJson) => {
-    const r = spawnSync("perl", [`${tmpDir}/PlLeaf.pl`], {
+    const r = spawnSync("perl", [join(ROOT, "wrappers/PlLeaf.pl")], {
       input: "[" + recordJson + "]",
       encoding: "utf8",
       timeout: 60000,
@@ -84,7 +95,7 @@ import("/tmp/gitpp-js-clone/src/gitpp.js").then(async (mod) => {
     return r.stdout.trim();
   },
   c: async (recordJson) => {
-    const r = spawnSync(`${tmpDir}/CLleaf`, [], {
+    const r = spawnSync(join(ROOT, "CLleaf"), [], {
       input: "[" + recordJson + "]",
       encoding: "utf8",
       timeout: 60000,
@@ -160,7 +171,7 @@ if (disagreements.length > 0) {
   }
 }
 
-writeFileSync(`${tmpDir}/results.json`, JSON.stringify({
+writeFileSync(`${ROOT}/results.json`, JSON.stringify({
   total: results.length,
   agree, disagree, errors,
   elapsed_seconds: parseFloat(elapsed),

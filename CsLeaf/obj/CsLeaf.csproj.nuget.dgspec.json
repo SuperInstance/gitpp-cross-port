@@ -1,0 +1,131 @@
+{
+  "format": 1,
+  "restore": {
+    "/tmp/gitpp-cross-port/CsLeaf/CsLeaf.csproj": {}
+  },
+  "projects": {
+    "/tmp/gitpp-cross-port/CsLeaf/CsLeaf.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/tmp/gitpp-cross-port/CsLeaf/CsLeaf.csproj",
+        "projectName": "CsLeaf",
+        "projectPath": "/tmp/gitpp-cross-port/CsLeaf/CsLeaf.csproj",
+        "packagesPath": "/tmp/fake-home/.nuget/packages/",
+        "outputPath": "/tmp/gitpp-cross-port/CsLeaf/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/tmp/fake-home/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net9.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net9.0": {
+            "targetAlias": "net9.0",
+            "projectReferences": {
+              "/tmp/gitpp-cs/src/Gitpp.csproj": {
+                "projectPath": "/tmp/gitpp-cs/src/Gitpp.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net9.0": {
+          "targetAlias": "net9.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/9.0.316/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/tmp/gitpp-cs/src/Gitpp.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/tmp/gitpp-cs/src/Gitpp.csproj",
+        "projectName": "Gitpp",
+        "projectPath": "/tmp/gitpp-cs/src/Gitpp.csproj",
+        "packagesPath": "/tmp/fake-home/.nuget/packages/",
+        "outputPath": "/tmp/gitpp-cs/src/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/tmp/gitpp-cs/NuGet.Config",
+          "/tmp/fake-home/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net9.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net9.0": {
+            "targetAlias": "net9.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net9.0": {
+          "targetAlias": "net9.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/9.0.316/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "version": 3,
+  "targets": {
+    "net9.0": {
+      "Gitpp/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "compile": {
+          "bin/placeholder/Gitpp.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Gitpp.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Gitpp/1.0.0": {
+      "type": "project",
+      "path": "../../gitpp-cs/src/Gitpp.csproj",
+      "msbuildProject": "../../gitpp-cs/src/Gitpp.csproj"
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net9.0": [
+      "Gitpp >= 1.0.0"
+    ]
+  },
+  "packageFolders": {
+    "/tmp/fake-home/.nuget/packages/": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "/tmp/gitpp-cross-port/CsLeaf/CsLeaf.csproj",
+      "projectName": "CsLeaf",
+      "projectPath": "/tmp/gitpp-cross-port/CsLeaf/CsLeaf.csproj",
+      "packagesPath": "/tmp/fake-home/.nuget/packages/",
+      "outputPath": "/tmp/gitpp-cross-port/CsLeaf/obj/",
+      "projectStyle": "PackageReference",
+      "configFilePaths": [
+        "/tmp/fake-home/.nuget/NuGet/NuGet.Config"
+      ],
+      "originalTargetFrameworks": [
+        "net9.0"
+      ],
+      "sources": {
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "net9.0": {
+          "targetAlias": "net9.0",
+          "projectReferences": {
+            "/tmp/gitpp-cs/src/Gitpp.csproj": {
+              "projectPath": "/tmp/gitpp-cs/src/Gitpp.csproj"
+            }
+          }
+        }
+      },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
+      },
+      "SdkAnalysisLevel": "9.0.300"
+    },
+    "frameworks": {
+      "net9.0": {
+        "targetAlias": "net9.0",
+        "imports": [
+          "net461",
+          "net462",
+          "net47",
+          "net471",
+          "net472",
+          "net48",
+          "net481"
+        ],
+        "assetTargetFallback": true,
+        "warn": true,
+        "frameworkReferences": {
+          "Microsoft.NETCore.App": {
+            "privateAssets": "all"
+          }
+        },
+        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/9.0.316/PortableRuntimeIdentifierGraph.json"
+      }
+    }
+  }
+}

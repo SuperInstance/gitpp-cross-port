@@ -4,15 +4,17 @@
 Per spec §3.5: 10,000 random float64 values + 4 targeted splitters 
 must produce identical bytes across ports.
 
-We extend this with multi-key and nested-object cases for higher 
-coverage:
+We extend this with multi-key, nested-object, and numeric-string cases
+for higher coverage:
 - 10,000 single-effect records with random float64 values
 - 4 targeted splitters (1e-5, 2.5e-7, -0.0, 724818294626474393600)
 - 5,000 multi-effect records (2-5 effects per record)
 - 1,000 nested-object records
 - 1,000 array-effect records
+- 2,000 records pairing a real number with a numeric-string twin
+- 1,000 records whose only effect is a numeric string
 
-Total: 17,004 records per fuzz batch.
+Total: 20,004 records per fuzz batch.
 """
 import json
 import struct
@@ -36,6 +38,30 @@ def random_float64():
 
 def random_string():
     return ''.join(random.choice('abcdefghijklmnop') for _ in range(random.randint(3, 12)))
+
+def numeric_string():
+    """A STRING whose content is a valid number literal.
+
+    gitpp-pl v0.1.5 shipped a leaf defect here: JSON::PP returns a bare
+    scalar for both a JSON number and a JSON string, and the port used
+    looks_like_number() to decide which -- true for both -- so the string
+    was emitted unquoted and hashed as a number. The 17,004-record corpus
+    never found it because every effect was a real number.
+
+    These records exist to keep that path under test forever.
+    """
+    v = random_float64()
+    forms = [
+        repr(v),                 # 1.5e+20
+        f"{v}",                  # 150000000000000000000
+        f"{v:.6g}",
+        f"{v:.15g}",
+        f"{v:.17g}",
+        str(int(v)) if abs(v) < 1e15 else f"{v:.0f}",
+        "-0.0", "0", "1", "1e-5", "1e400" if random.random() < 0.1 else "1e5",
+        " 42", "42 ", "+7", "0x1f", "Infinity", "NaN", "1_000",
+    ]
+    return random.choice(forms)
 
 def make_single_effect_record(effects, id_prefix='rec'):
     return {
@@ -66,6 +92,16 @@ def make_multi_effect_record(n_effects):
                 random_string(): random_string(),
             }
     return make_single_effect_record(effects)
+
+def make_numstr_pair_record():
+    """One key set twice in the same record is impossible in JSON, so use two
+    keys: the real number and its string twin. A port that cannot tell them
+    apart produces identical leaves for keys that should differ."""
+    v = random_float64()
+    return {
+        "n": v,
+        "s": numeric_string(),
+    }
 
 def make_nested_record():
     effects = {
@@ -106,6 +142,16 @@ for _ in range(1000):
 # 5. 1,000 array records
 for _ in range(1000):
     records.append(make_array_record())
+
+# 6. 2,000 records mixing a real number with a numeric STRING twin.
+#    Added after gitpp-pl v0.1.5: the number/string confusion lived in a
+#    path none of the classes above ever reached.
+for _ in range(2000):
+    records.append(make_single_effect_record(make_numstr_pair_record()))
+
+# 7. 1,000 single-key records whose only effect is a numeric string
+for _ in range(1000):
+    records.append(make_single_effect_record({"x": numeric_string()}))
 
 # Write
 out = sys.argv[1] if len(sys.argv) > 1 else '/tmp/gitpp-fuzz/records.json'
