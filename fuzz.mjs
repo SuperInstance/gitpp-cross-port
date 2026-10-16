@@ -57,7 +57,13 @@ const runners = {
 import sys, json
 import os; sys.path.insert(0, os.environ.get('GITPP_DOCTOR_DIR', '/tmp/gitpp-doctor'))
 import gitpp_doctor
-record = json.load(open('${tmpDir}/_py_in.json'))[0]
+# Use the port's own decode entry point, NOT raw json.load. The port parses
+# every JSON number into the float64 domain (parse_int=float); raw json.load
+# leaves bare integer literals as arbitrary-precision ints, which is a
+# different value for a different leaf. Testing the runner's idea of decoding
+# instead of the port's is how 724818294626474393600 diverged while the
+# suite kept reporting disagreement after the port was already fixed.
+record = gitpp_doctor.loads(open('${tmpDir}/_py_in.json').read())[0]
 print(gitpp_doctor.record_leaf(record))
 `], { encoding: "utf8", timeout: 60000, env: process.env });
     if (r.status !== 0) throw new Error(r.stderr || r.stdout);

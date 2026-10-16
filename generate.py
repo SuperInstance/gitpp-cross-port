@@ -14,7 +14,8 @@ for higher coverage:
 - 2,000 records pairing a real number with a numeric-string twin
 - 1,000 records whose only effect is a numeric string
 
-Total: 20,004 records per fuzz batch.
+Total: 20,043 records per fuzz batch (splitters first, plus 39
+float64-domain boundary probes).
 """
 import json
 import struct
@@ -123,13 +124,28 @@ def make_array_record():
 
 records = []
 
+# 0. The spec's own targeted splitters FIRST, so a truncated sample can
+#    never skip them. These four sat at index 10000 of the old corpus and a
+#    1000-record run reported 1000/1000 without ever reaching them -- while
+#    724818294626474393600 was in fact diverging on two of five ports.
+SPLITTERS = [1e-5, 2.5e-7, -0.0, 724818294626474393600]
+for v in SPLITTERS:
+    records.append(make_single_effect_record({"x": v}, id_prefix="splitter"))
+
+# Boundary probes for the float64-domain rule: bare integer literals that a
+# naive JSON decoder turns into an int or a string instead of a float64.
+for v in [9007199254740992, 9007199254740993, 2**53, 2**53 + 2,
+          2**63 - 1, 2**63, 2**64, 10**18, 10**19, 10**20,
+          -2**63, -(2**63) - 1, 123456789012345678901234567890]:
+    records.append(make_single_effect_record({"x": v}, id_prefix="intlit"))
+    records.append(make_single_effect_record({"x": str(v)}, id_prefix="intstr"))
+    records.append(make_single_effect_record({"x": float(v)}, id_prefix="intflt"))
+
 # 1. 10,000 single-effect random float64
 for _ in range(10000):
     records.append(make_single_effect_record({"x": random_float64()}))
 
-# 2. 4 targeted splitters
-for v in [1e-5, 2.5e-7, -0.0, 724818294626474393600]:
-    records.append(make_single_effect_record({"x": v}, id_prefix="splitter"))
+# (the targeted splitters moved to position 0, above)
 
 # 3. 5,000 multi-effect records
 for _ in range(5000):
