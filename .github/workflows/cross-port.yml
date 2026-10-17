@@ -1,0 +1,181 @@
+name: cross-port leaf equivalence
+
+# The byte-level cross-port equivalence suite: 20,043 leaf records and 131,499
+# metamorphic mutants through SIX ports.
+#
+# This repo previously had no CI at all. That is why a port could be broken --
+# or absent, or unable to load -- without anything turning red: the suite could
+# only ever have been run by hand, and the receipts in the README were a
+# transcript rather than an enforced invariant.
+#
+# The harness now FAILS on a participant that cannot run (see participants.mjs),
+# so the job below is only meaningful because of that: a green run means six
+# ports compared every record, not that some subset agreed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  leaf-equivalence:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # A WRITABLE DOTNET_CLI_HOME with a resolvable NuGet.Config. Without one,
+      # every `dotnet build` fails with an XML parse error that names neither
+      # the cause nor the participant, and the symptom downstream is "the cs
+      # participant could not load" -- which reads as a harness problem.
+      - name: Prepare the .NET CLI home
+        run: |
+          echo "DOTNET_CLI_HOME=$RUNNER_TEMP/dotnet" >> "$GITHUB_ENV"
+          echo "NUGET_PACKAGES=$RUNNER_TEMP/nuget" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/dotnet" "$RUNNER_TEMP/nuget"
+
+      # OTP 27 + Elixir 1.17, from builds.hex.pm, pinned by SHA-256.
+      #
+      # NOT the distro packages. ubuntu's apt Elixir is 1.14 and
+      # gitpp-beam/lib/gitpp/canon.ex uses a runtime-sized binary segment
+      # (<<...::binary-size(^decpt), ...>>), which is 1.17 syntax: 1.14 cannot
+      # even PARSE the port. A port that cannot compile exits non-zero, which
+      # this harness reports as a missing participant -- so an old toolchain
+      # would read as "the sixth port is broken". The version is asserted in the
+      # install step, where the message can name the real cause.
+      - name: Install OTP 27 + Elixir 1.17
+        run: |
+          bash scripts/install-beam.sh
+          echo "$HOME/toolchain/beam/otp/bin" >> "$GITHUB_PATH"
+          echo "$HOME/toolchain/beam/elixir/bin" >> "$GITHUB_PATH"
+          echo "ELIXIR_ERL_OPTIONS=+fnu" >> "$GITHUB_ENV"
+          echo "MIX_HOME=$HOME/toolchain/beam/.mix" >> "$GITHUB_ENV"
+          echo "HEX_HOME=$HOME/toolchain/beam/.hex" >> "$GITHUB_ENV"
+          echo "BEAM_DISTRO=ubuntu-22.04" >> "$GITHUB_ENV"
+          elixir --version
+
+      - name: Clone the ports
+        run: |
+          git clone --depth 1 https://github.com/patchwork-quilt/git.pp-spec   ../git.pp-spec
+          git clone --depth 1 https://github.com/patchwork-quilt/gitpp-beam  ../gitpp-beam
+          # The Python participant. NOTE: this is git.pp-doctor, NOT
+          # git.pp-ng/referee -- the latter ships fold.py and exposes no
+          # gitpp_doctor module, and fuzz.mjs imports `gitpp_doctor` and calls
+          # its `loads` / `record_leaf`. The README in this repo points at
+          # git.pp-ng/referee, which is why the path was wrong here first.
+          git clone --depth 1 https://github.com/SuperInstance/git.pp-doctor ../git.pp-doctor
+          git clone --depth 1 https://github.com/SuperInstance/gitpp-js       ../gitpp-js
+          git clone --depth 1 https://github.com/SuperInstance/gitpp-cs       ../gitpp-cs
+          git clone --depth 1 https://github.com/SuperInstance/gitpp-pl       ../gitpp-pl
+
+      # gnu99, deliberately. MEASURED, and the measurement does not support the
+      # folklore: on the toolchain this was developed against (gcc 12.10) both
+      # -std=c99 and -std=gnu99 produce a byte-identical 21,640-byte binary, and
+      # for gitpp-c's gitpp.c gnu99 only clears four -Wint-conversion warnings.
+      # It is specified here anyway because the C99 mode has been reported to
+      # emit an empty object on other gcc versions, and an empty leaf binary is
+      # the worst possible failure for this suite: the build SUCCEEDS and the
+      # harness then reports 20,043 disagreements, which reads as a port defect
+      # rather than a compiler flag.
+      - name: Build the C99 leaf wrapper
+        run: |
+          gcc -std=gnu99 -O2 -Wall -o CLleaf CLleaf.c
+          # A build that produces no leaf is a build failure, not a 20,043-record
+          # disagreement. Assert the binary answers a probe before the corpora.
+          echo '[{"id":"probe","kind":"task","parents":[],"effects":{"x":1},"reason":null}]' | ./CLleaf | grep -Eq '^[0-9a-f]{64}$' \
+            || { echo "CLleaf produced no leaf for a probe record"; exit 1; }
+          echo "CLleaf ok"
+
+      # The C# leaf wrapper, built against the library from the gitpp-cs
+      # checkout. fuzz.mjs and run_mutants.mjs both look for the dll at the
+      # hardcoded path CsLeaf/bin/Debug/net9.0/CsLeaf.dll, so the build
+      # configuration is not a choice.
+      - name: Build the C# leaf wrapper
+        env:
+          GITPP_CS_DIR: ${{ github.workspace }}/../gitpp-cs
+        run: dotnet build CsLeaf/CsLeaf.csproj -c Debug
+
+      - name: Compile the Elixir port
+        working-directory: ../gitpp-beam
+        run: MIX_ENV=prod mix compile
+
+      # A standalone gate on the Elixir wrapper's own invariant, run BEFORE the
+      # corpora. wrappers/ElixirLeaf.exs composes the leaf from the port's
+      # public API (Gitpp.Fold.leaf/1 is defp), so the composition is checked
+      # against the port's own Fold.checkpoint_root/2. If the port's private
+      # leaf/1 ever diverges from it, the wrapper refuses to report leaves
+      # instead of confidently reporting the wrong bytes.
+      - name: Elixir wrapper self-check against the pinned leaves
+        env:
+          GITPP_EX_EBIN: ${{ github.workspace }}/../gitpp-beam/_build/prod/lib/gitpp_beam/ebin
+        run: |
+          python3 - <<'PY'
+          import json
+          d = json.load(open("../git.pp-spec/cross-port-leafs.json"))
+          json.dump([c["input"] for c in d["cases"]], open("/tmp/pins.json", "w"))
+          for c in d["cases"]:
+              print(c["leaf"])
+          PY
+          elixir -pa "$GITPP_EX_EBIN" wrappers/ElixirLeaf.exs < /tmp/pins.json > /tmp/pins_got.txt
+          cat /tmp/pins_got.txt
+          python3 - <<'PY'
+          import json, sys
+          d = json.load(open("../git.pp-spec/cross-port-leafs.json"))
+          want = [c["leaf"] for c in d["cases"]]
+          got = [l.strip() for l in open("/tmp/pins_got.txt") if l.strip()]
+          if want != got:
+              print("PINNED LEAF MISMATCH"); sys.exit(1)
+          print("all %d pinned leaves match" % len(want))
+          PY
+
+      - name: Generate the corpora
+        run: |
+          mkdir -p "$RUNNER_TEMP/corp"
+          python3 generate.py "$RUNNER_TEMP/corp/records.json"
+          python3 mutate/mutate.py "$RUNNER_TEMP/corp/records.json" "$RUNNER_TEMP/corp/mutants.json"
+          wc -c "$RUNNER_TEMP/corp/records.json" "$RUNNER_TEMP/corp/mutants.json"
+
+      - name: Leaf equivalence (20,043 records, six ports)
+        env:
+          GITPP_DOCTOR_DIR: ${{ github.workspace }}/../git.pp-doctor
+          GITPP_JS: ${{ github.workspace }}/../gitpp-js/src/gitpp.js
+          GITPP_PL_DIR: ${{ github.workspace }}/../gitpp-pl
+          GITPP_EX_EBIN: ${{ github.workspace }}/../gitpp-beam/_build/prod/lib/gitpp_beam/ebin
+          FUZZ_BATCH: '1000'
+        run: node fuzz.mjs "$RUNNER_TEMP/corp/records.json"
+
+      # The mutation pass. run_mutants.mjs exits non-zero when any participant
+      # fails or any port disagrees; before this change it exited 0
+      # unconditionally, so a broken port produced 131,499 "disagreements" and a
+      # green build.
+      - name: Mutation pass (131,499 mutants, six ports)
+        env:
+          GITPP_DOCTOR_DIR: ${{ github.workspace }}/../git.pp-doctor
+          GITPP_JS: ${{ github.workspace }}/../gitpp-js/src/gitpp.js
+          GITPP_PL_DIR: ${{ github.workspace }}/../gitpp-pl
+          GITPP_EX_EBIN: ${{ github.workspace }}/../gitpp-beam/_build/prod/lib/gitpp_beam/ebin
+          MUT_BATCH: '1000'
+        run: node mutate/run_mutants.mjs "$RUNNER_TEMP/corp/mutants.json"
+
+      - name: Publish results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-port-results
+          path: |
+            results.json
+            ${{ runner.temp }}/mut-run/mutant-summary.json
+            ${{ runner.temp }}/mut-run/mutant-disagreements.json

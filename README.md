@@ -13,6 +13,13 @@ This is a permanent artifact of the [git.pp fold ports](../git.pp-spec) ecosyste
 | **JavaScript** (4th) | JS (ESM) | yes | [SuperInstance/gitpp-js](https://github.com/SuperInstance/gitpp-js) |
 | **C#** (5th) | C# / .NET 9 | yes | [SuperInstance/gitpp-cs](https://github.com/SuperInstance/gitpp-cs) |
 | **Perl** (6th) | Perl 5.36 | yes | [SuperInstance/gitpp-pl](https://github.com/SuperInstance/gitpp-pl) |
+| **Elixir** (8th) | Elixir 1.17 / OTP 27 | yes | [patchwork-quilt/gitpp-beam](https://github.com/patchwork-quilt/gitpp-beam) |
+
+The Elixir port is the only one in the fleet written by a **different
+organisation** from the spec's author, which makes it the only genuinely
+independent implementation here. Independence is the scarce resource: every
+real defect found in this project was found by divergence from something the
+spec's author did not write. Adding it was not a formality — it found three.
 
 All 4 ports are written from the spec v0.3.0 alone (doc-only discipline: zero reads of the other ports). They diverge only in the implementation language; the byte output of the fold is identical.
 
@@ -46,6 +53,39 @@ Plus **4 pinned cross-port leaf verification cases** from `git.pp-spec/cross-por
 ```
 
 This is the closure root at `poc-quilt-1@task-c`, computed from the live 8-record set in `https://gitpp.superinstance.dev`. All 4 ports produce this exact hash. The hub (TypeScript) and the Elixir port also produce it, but those aren't in this repo.
+
+## The sixth port, and the harness bug it exposed
+
+`feat/elixir-port` adds `patchwork-quilt/gitpp-beam`, and with it:
+
+* **`participants.mjs`** — roster assertion, per-port preflight, and a ledger
+  that marks a batch invalid instead of turning a dead port into data.
+* **`.github/workflows/cross-port.yml`** — this repo had no CI, so nothing here
+  could ever have turned red on its own.
+
+### Does the harness report a port that cannot run, or drop it?
+
+Measured, on the harnesses as they were, by making a port unloadable and by
+making one print nothing:
+
+| Harness | Sabotage | What it printed | Exit |
+|---|---|---|---|
+| `fuzz.mjs` | port cannot load | a Node stack trace; the whole run lost | 1 |
+| `fuzz.mjs` | port prints nothing | `0 agree, 200 disagree, 0 errors (out of 200)` | **0** |
+| `mutate/run_mutants.mjs` | port cannot load | `0 agree, 200 disagree, 1 errors` + `compared ports: py, js, c, cs, pl` | **0** |
+| `mutate/run_mutants.mjs` | port prints nothing | identical | **0** |
+| `run.mjs` (fold suite) | port cannot load | 29 x `FAIL [participants missing: pl]` | 1 |
+
+The fold suite answered the question correctly. **The other two did not.** A
+port that computed *nothing* was reported as a port that computed the *wrong
+thing* — 20,043 and 131,499 fabricated disagreements respectively — under a
+roster line that named it as a participant, with a zero exit status. The cause
+in both was one line: a failed runner was caught into `leaves[name] = []`, and
+`leaves[name][k] ?? "MISSING"` then turned an absent port into a *value* in the
+comparison.
+
+Both harnesses now fail, before the corpus is touched, and say which port.
+All of it is mutation-tested — see the commit message.
 
 ## Bugs found and fixed
 
