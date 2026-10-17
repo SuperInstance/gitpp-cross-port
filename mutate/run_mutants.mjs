@@ -133,12 +133,16 @@ const BATCH = parseInt(process.env.MUT_BATCH || "250", 10);
 // 14,611 mutants buries the signal. That exclusion is the right call
 // while the bug is open, and the wrong call once it is fixed.
 //
-// Set MUT_EXCLUDE=c to reproduce the old behaviour, and note that the
-// run will then show 14,611 disagreements from the known defect alone.
-const COMPARED = (process.env.MUT_EXCLUDE || "")
-  .split(",").map((s) => s.trim()).filter(Boolean).length
-  ? names.filter((n) => !(process.env.MUT_EXCLUDE || "").split(",").map((s) => s.trim()).includes(n))
-  : names;
+// Set MUT_EXCLUDE=c (or GITPP_EXCLUDE=c) to reproduce the old behaviour, and
+// note that the run will then show 14,611 disagreements from the known defect
+// alone. Whatever is excluded is PRINTED, so the exclusion cannot be mistaken
+// for a passing run over the full roster.
+//
+// This used to be an inline expression over MUT_EXCLUDE alone, which meant
+// GITPP_EXCLUDE -- the variable this harness's OWN roster message tells the
+// reader to use -- did nothing here: the roster honoured it, the comparison
+// silently did not. One list of facts, one place to read it.
+const COMPARED = [...roster.want, ...roster.reference];
 
 const pre = await preflight(runners, { excluded: EXCLUDED, probe: DEFAULT_PROBE, label: "mutate" });
 if (!pre.ok) process.exit(fatalPreflight(pre, "mutate"));
@@ -156,9 +160,12 @@ for (let b = 0; b < mutants.length; b += BATCH) {
   const payload = JSON.stringify(chunk);
   const leaves = {};
   let batchInvalid = false;
-  for (const [name, fn] of Object.entries(runners)) {
+  // COMPARED, not Object.keys(runners): an excluded port must not be EXECUTED.
+  // Running it anyway meant a failing excluded port invalidated every batch, so
+  // declaring an exclusion could only ever turn a green run red.
+  for (const name of COMPARED) {
     let out;
-    try { out = await fn(payload); }
+    try { out = await runners[name](payload); }
     catch (e) {
       ledger.fail(name, `batch starting at mutant ${b}: ${errText(e)}`);
       batchInvalid = true;

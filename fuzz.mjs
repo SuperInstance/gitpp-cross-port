@@ -189,7 +189,11 @@ const roster = rosterCheck(runners, { excluded: EXCLUDED });
 console.log(reportRoster(roster, "fuzz"));
 if (!roster.ok) process.exit(fatalRoster(roster, "fuzz"));
 
-if (!existsSync(exEbin())) {
+// Only when `ex` is actually in the compared roster. An unconditional check
+// here would make GITPP_EXCLUDE=ex unusable: the roster and the preflight both
+// honour a declared exclusion, and then this line would fail the run over a
+// port the run has already said it is not using.
+if (roster.want.includes("ex") && !existsSync(exEbin())) {
   console.error(`\n${"=".repeat(72)}`);
   console.error("FATAL: fuzz -- the Elixir port's compiled modules are not present.");
   console.error("=".repeat(72));
@@ -199,6 +203,16 @@ if (!existsSync(exEbin())) {
   console.error("  which the harness would report as 20,043 port disagreements and exit 0.\n");
   process.exit(1);
 }
+
+// The ports this run will actually EXECUTE: the required roster minus declared
+// exclusions, plus the reference if one is registered.
+//
+// Iterating `Object.keys(runners)` instead would RUN an excluded port, and a
+// failing excluded port would then mark every batch invalid -- so
+// GITPP_EXCLUDE=ex, which is how you run this suite without a BEAM
+// toolchain, reported "0 agree, 0 disagree, 200 not compared". An exclusion
+// that does not exclude is worse than no exclusion.
+const COMPARED = [...roster.want, ...roster.reference];
 
 const pre = await preflight(runners, { excluded: EXCLUDED, probe: DEFAULT_PROBE, label: "fuzz" });
 if (!pre.ok) process.exit(fatalPreflight(pre, "fuzz"));
@@ -227,10 +241,10 @@ for (let b = 0; b < recordJsonStrings.length; b += BATCH) {
   // the opposite -- it turned an absent port into 20,043 disagreements.
   const leaves = {};
   let batchInvalid = false;
-  for (const [name, run] of Object.entries(runners)) {
+  for (const name of COMPARED) {
     let out;
     try {
-      out = await run(payload);
+      out = await runners[name](payload);
     } catch (e) {
       ledger.fail(name, `batch starting at record ${b}: ${errText(e)}`);
       batchInvalid = true;
@@ -249,7 +263,7 @@ for (let b = 0; b < recordJsonStrings.length; b += BATCH) {
 
   for (let k = 0; k < chunk.length; k++) {
     const row = { id: `idx:${b + k}`, ports: {}, invalid: batchInvalid };
-    for (const name of Object.keys(runners)) row.ports[name] = leaves[name]?.[k] ?? "MISSING";
+    for (const name of COMPARED) row.ports[name] = leaves[name]?.[k] ?? "MISSING";
     results.push(row);
   }
   const agree = results.filter((r) => !r.invalid && new Set(Object.values(r.ports)).size === 1).length;
@@ -301,7 +315,7 @@ console.log(`\nFuzz complete in ${elapsed}s`);
 // this array would have left the "ports agree with each other" line silently
 // measuring five ports while the roster claimed six. Two lists for one fact is
 // exactly how a participant goes missing without anyone noticing.
-const PORT_NAMES = Object.keys(runners).filter((n) => !REFERENCE_PORTS.includes(n));
+const PORT_NAMES = COMPARED.filter((n) => !REFERENCE_PORTS.includes(n));
 const hasHub = Object.prototype.hasOwnProperty.call(runners, "hub");
 
 // The reference is registered only when a build exists, which IS a silent
