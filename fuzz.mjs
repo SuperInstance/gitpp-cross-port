@@ -102,9 +102,16 @@ import(process.env.GITPP_JS || "/tmp/gitpp-js/src/gitpp.js").then(async (mod) =>
   },
   c: async (recordJson) => {
     // CLleaf reads the record array on STDIN and prints one leaf per line.
-    const r = spawnSync("node", [join(ROOT, "cleaf.mjs"), recordJson, `${tmpDir}/_c_out.txt`], {
+    // Spool to a file and pass '@path'. A single argv entry is capped at
+    // MAX_ARG_STRLEN (128 KiB on Linux), so passing the whole batch as an
+    // argument killed this port with E2BIG at BATCH=2000 -- and spawnSync
+    // reports E2BIG as status null, which the harness logged as a crash.
+    // Every other runner already spools or uses stdin.
+    writeFileSync(`${tmpDir}/_c_in.json`, recordJson);
+    const r = spawnSync("node", [join(ROOT, "cleaf.mjs"), `@${tmpDir}/_c_in.json`, `${tmpDir}/_c_out.txt`], {
       encoding: "utf8", timeout: 60000, env: process.env,
     });
+    if (r.error) throw new Error(`c port: ${r.error.code || r.error.message}`);
     if (r.status !== 0) throw new Error(r.stderr || r.stdout);
     return readFileSync(`${tmpDir}/_c_out.txt`, "utf8").trim();
   },
