@@ -87,6 +87,20 @@ comparison.
 Both harnesses now fail, before the corpus is touched, and say which port.
 All of it is mutation-tested — see the commit message.
 
+## What the sixth port found
+
+Full receipts are in the commit message for `feat/elixir-port`. Summary:
+
+| Where | What | Status |
+|---|---|---|
+| [`gitpp-beam#5`](https://github.com/patchwork-quilt/gitpp-beam/issues/5) | **§5.5 violated, silently.** An orphan's descendants are auto-orphaned, so `state` comes back `{}` where the spec requires the descendant's effects. Does not crash; returns a confident wrong answer. | filed |
+| [`gitpp-beam#4`](https://github.com/patchwork-quilt/gitpp-beam/issues/4) | `Canon.value_key(:null)` raises `FunctionClauseError` — any record with a null-valued effect, contested or not, crashes `derive/1`. | filed |
+| [`gitpp-beam#6`](https://github.com/patchwork-quilt/gitpp-beam/issues/6) | No §5.6 `setters`, and not recoverable from the public API: the per-key winner lives in the private `resolve/3` and survives only for contested keys. | filed |
+| [`gitpp-pl#4`](https://github.com/SuperInstance/gitpp-pl/issues/4) | **Pre-existing, in the Perl port.** `record_leaf` applies `Encode::encode_utf8` to a string that is already UTF-8 bytes, so every non-ASCII byte is double-encoded: its leaf is not the SHA-256 of its own `canonical_json`, and it misses the spec's pinned `case-4-non-bmp-id`. ASCII is unaffected, which is why 20,043/20,043 records passed. | filed |
+| `gitpp-c#1` | **Pre-existing, in the C port.** `escape-injection` class; already known and still open. | open |
+
+No port was modified. This repo is a consumer.
+
 ## Bugs found and fixed
 
 This cross-port test has caught (and the maintainers have fixed) several real bugs in the various ports:
