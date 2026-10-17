@@ -20,7 +20,7 @@ const recordJsonStrings = [];
     const c = recordsText[i];
     if (inString) {
       if (escape) escape = false;
-      else if (c === "\\\\") escape = true;
+      else if (c === "\\") escape = true;
       else if (c === '"') inString = false;
       continue;
     }
@@ -34,7 +34,7 @@ console.log(`Found ${recordJsonStrings.length} records`);
 // Build a simple id->index map by parsing just the id (use raw text scan)
 const recordIds = [];
 for (const s of recordJsonStrings) {
-  const m = s.match(/"id"\\s*:\\s*"([^"]+)"/);
+  const m = s.match(/"id"\s*:\s*"([^"]+)"/);
   recordIds.push(m ? m[1] : "?");
 }
 
