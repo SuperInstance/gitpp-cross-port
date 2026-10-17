@@ -93,6 +93,7 @@ Full receipts are in the commit message for `feat/elixir-port`. Summary:
 
 | Where | What | Status |
 |---|---|---|
+| [`gitpp-beam#7`](https://github.com/patchwork-quilt/gitpp-beam/issues/7) | **Leaf divergence, found only by the mutation pass.** `v * 1.0` rounds bignums one ulp toward zero on OTP 27. 5/131,499 mutants (`float-mantissa-flip` ×3, `float-regime` ×2); 5 of 6,076 large integer literals in the corpus. | filed |
 | [`gitpp-beam#5`](https://github.com/patchwork-quilt/gitpp-beam/issues/5) | **§5.5 violated, silently.** An orphan's descendants are auto-orphaned, so `state` comes back `{}` where the spec requires the descendant's effects. Does not crash; returns a confident wrong answer. | filed |
 | [`gitpp-beam#4`](https://github.com/patchwork-quilt/gitpp-beam/issues/4) | `Canon.value_key(:null)` raises `FunctionClauseError` — any record with a null-valued effect, contested or not, crashes `derive/1`. | filed |
 | [`gitpp-beam#6`](https://github.com/patchwork-quilt/gitpp-beam/issues/6) | No §5.6 `setters`, and not recoverable from the public API: the per-key winner lives in the private `resolve/3` and survives only for contested keys. | filed |

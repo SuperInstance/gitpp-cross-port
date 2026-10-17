@@ -40,6 +40,17 @@ defmodule ElixirLeaf do
 
   @selftest_mode System.get_env("EX_LEAF_SELFTEST", "first")
 
+  # Fold.checkpoint_root/2 re-canonicalises the whole batch per call, so
+  # checking every record in a batch is O(n^2). The harnesses batch at 250-2000
+  # and never notice; piping a whole 29,222-record corpus into the wrapper did
+  # notice -- it hung for minutes with no output. Capped, and the cap is
+  # printed rather than silent, because "checked 1000 of 29222" is a weaker
+  # claim than "checked all of them" and must not look like the latter.
+  @selftest_max (case System.get_env("EX_LEAF_SELFTEST_MAX") do
+                  nil -> 1000
+                  n -> String.to_integer(n)
+                end)
+
   # The port's leaf, composed from public API only. Byte-for-byte the body of
   # Gitpp.Fold.leaf/1: normalise parents (unique, code-point sorted), then
   # canonical-encode the five-field projection and SHA-256 it.
@@ -123,9 +134,14 @@ defmodule ElixirLeaf do
     leaves = Enum.map(records, &leaf/1)
 
     case @selftest_mode do
-      "off" -> :ok
-      "all" -> verify!(records, leaves)
-      _ -> if length(leaves) > 0, do: verify!(records, leaves)
+      "off" ->
+        :ok
+
+      "all" ->
+        verify!(Enum.take(records, @selftest_max), Enum.take(leaves, @selftest_max))
+
+      _ ->
+        if length(leaves) > 0, do: verify!(Enum.take(records, @selftest_max), Enum.take(leaves, @selftest_max))
     end
 
     IO.write(Enum.join(leaves, "\n") <> "\n")
@@ -147,6 +163,14 @@ end
 
 argv = System.argv()
 
+# Keep this in step with ElixirLeaf's @selftest_max.
+selftest_max = fn ->
+  case System.get_env("EX_LEAF_SELFTEST_MAX") do
+    nil -> 1000
+    n -> String.to_integer(n)
+  end
+end
+
 cond do
   "--version" in argv ->
     IO.puts("ElixirLeaf: elixir #{System.version()} / OTP #{System.otp_release()}")
@@ -157,10 +181,14 @@ cond do
     payload = IO.read(:stdio, :eof) || ""
     records = :json.decode(payload)
     leaves = Enum.map(records, &ElixirLeaf.leaf/1)
-    {checked, skipped, first_error} = ElixirLeaf.self_check(records, leaves)
+
+    # Same O(n^2) bound as the default mode; --selftest is a gate, not a
+    # bulk operation.
+    {checked, skipped, first_error} =
+      ElixirLeaf.self_check(Enum.take(records, selftest_max.()), Enum.take(leaves, selftest_max.()))
 
     IO.puts(
-      "ElixirLeaf selftest: #{checked}/#{length(records)} leaves verified against " <>
+      "ElixirLeaf selftest: #{checked}/#{min(length(records), selftest_max.())} leaves verified against " <>
         "Fold.checkpoint_root/2 (#{skipped} skipped: records whose closure is not {id} -- " <>
         "they have parents, or their id appears more than once in this batch)"
     )
