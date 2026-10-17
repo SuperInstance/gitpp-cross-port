@@ -101,13 +101,12 @@ import(process.env.GITPP_JS || "/tmp/gitpp-js/src/gitpp.js").then(async (mod) =>
     return r.stdout.trim();
   },
   c: async (recordJson) => {
-    const r = spawnSync(join(ROOT, "CLleaf"), [], {
-      input: recordJson,
-      encoding: "utf8",
-      timeout: 60000,
+    // CLleaf reads the record array on STDIN and prints one leaf per line.
+    const r = spawnSync("node", [join(ROOT, "cleaf.mjs"), recordJson, `${tmpDir}/_c_out.txt`], {
+      encoding: "utf8", timeout: 60000, env: process.env,
     });
     if (r.status !== 0) throw new Error(r.stderr || r.stdout);
-    return r.stdout.trim();
+    return readFileSync(`${tmpDir}/_c_out.txt`, "utf8").trim();
   },
 };
 
