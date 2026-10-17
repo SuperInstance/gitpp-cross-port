@@ -2,7 +2,7 @@
 // Cross-port fuzz test runner.
 // Reads records as raw text (NOT via JSON.parse) to preserve float64 precision.
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -111,6 +111,25 @@ import(process.env.GITPP_JS || "/tmp/gitpp-js/src/gitpp.js").then(async (mod) =>
   },
 };
 
+// The TypeScript hub, compiled to ESM (tsc -> HUB_BUILD). It is the reference
+// implementation, so excluding it would mean "all ports agree" is a claim only
+// about the ports. It diverges from all five on 448/20,043 today
+// (patchwork-quilt/git.pp-ng#28) and the suite must be able to SEE that rather
+// than have it hidden by construction.
+const HUB_BUILD = process.env.HUB_BUILD || "/tmp/hub-build/fold.js";
+if (existsSync(HUB_BUILD)) {
+  runners.hub = async (payloadText) => {
+    const inPath = `${tmpDir}/_hub_in.json`;
+    const outPath = `${tmpDir}/_hub_out.txt`;
+    writeFileSync(inPath, payloadText);
+    const r = spawnSync("node", [join(ROOT, "hubleaf.mjs"), inPath, outPath], {
+      encoding: "utf8", timeout: 60000, env: process.env,
+    });
+    if (r.status !== 0) throw new Error(r.stderr || r.stdout);
+    return readFileSync(outPath, "utf8").trim();
+  };
+}
+
 const ports = ["py", "js", "cs", "pl", "c"];
 
 console.log("Running fuzz...");
@@ -162,7 +181,25 @@ for (const r of results) {
 }
 
 console.log(`\nFuzz complete in ${elapsed}s`);
-console.log(`  ${agree} agree, ${disagree} disagree, ${errors} errors (out of ${results.length})`);
+// Report the five PORTS and the REFERENCE separately. Folding the hub into a
+// single "agree" number would make five conformant ports look broken because
+// the reference diverges -- which is the opposite of what this suite is for.
+const PORT_NAMES = ["py", "js", "cs", "pl", "c"];
+const hasHub = Object.prototype.hasOwnProperty.call(runners, "hub");
+if (hasHub) {
+  const portAgree = results.filter((r) => {
+    const v = PORT_NAMES.map((p) => r.ports[p]);
+    return v.every((x) => x === v[0]);
+  }).length;
+  const hubAgree = results.filter((r) => {
+    const portVals = PORT_NAMES.map((p) => r.ports[p]);
+    return r.ports.hub === portVals[0];
+  }).length;
+  console.log(`  ports     : ${portAgree}/${results.length} agree with each other`);
+  console.log(`  hub (ref) : ${hubAgree}/${results.length} agree with the ports  <- measured, see git.pp-ng#28`);
+} else {
+  console.log(`  ${agree} agree, ${disagree} disagree, ${errors} errors (out of ${results.length})`);
+}
 
 if (errorSamples.length > 0) {
   console.log("\nError samples:");
