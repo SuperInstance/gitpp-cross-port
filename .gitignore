@@ -1,0 +1,7 @@
+# Run artifacts. fuzz.mjs rewrites results.json on every run, so a tracked
+# copy is a snapshot of one moment -- and when two branches each record a
+# different run, the file conflicts and the conflict is meaningless.
+# The receipts belong in the commit message, not in a file that changes
+# under you.
+results.json
+fuzz-results-*.json
