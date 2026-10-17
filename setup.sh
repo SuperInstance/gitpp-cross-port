@@ -48,7 +48,38 @@ fi
 # and the sibling assemblies -- not just the one dll.
 if command -v dotnet >/dev/null 2>&1; then
   echo "  build ports/csharp"
-  ( cd ports/csharp && dotnet build test/Test.csproj -c Release -o "$ROOT/ports/csharp" >/dev/null )
+  # The build output is NOT suppressed. An earlier version sent it to
+  # /dev/null, so a build failure produced the single line
+  #     build ports/csharp
+  #     Process completed with exit code 1
+  # and nothing else -- no diagnostic at all. A build step that hides
+  # its own errors is a build step that cannot be debugged from a log.
+  #
+  # The DEFAULT output path is used, and the result is copied.
+  #
+  # It is NOT `dotnet build -o <dir>`. Pointing -o at a directory that is
+  # an ANCESTOR of the project directory silently excludes the project's
+  # own sources, because DefaultItemExcludes contains
+  # $(BaseOutputPath)/** -- and -o sets BaseOutputPath. The compile then
+  # contains only the GENERATED files:
+  #
+  #   obj/Release/net9.0/Test.GlobalUsings.g.cs
+  #   obj/Release/net9.0/.NETCoreApp,Version=v9.0.AssemblyAttributes.cs
+  #   obj/Release/net9.0/Test.AssemblyInfo.cs
+  #
+  # and the build fails with
+  #
+  #   CSC : error CS5001: Program does not contain a static 'Main' method
+  #         suitable for an entry point
+  #
+  # which points at the WRONG THING ENTIRELY. Program.cs is right there
+  # in the project. The build is fine; the output path was not.
+  ( cd ports/csharp && dotnet build test/Test.csproj -c Release )
+  mkdir -p ports/csharp
+  cp ports/csharp/test/bin/Release/net9.0/*.dll ports/csharp/ 2>/dev/null || true
+  cp ports/csharp/test/bin/Release/net9.0/*.json ports/csharp/ 2>/dev/null || true
+  test -f ports/csharp/Test.dll || {
+    echo "  FATAL: the C# port did not produce Test.dll"; exit 1; }
 fi
 
 # The corpus.
