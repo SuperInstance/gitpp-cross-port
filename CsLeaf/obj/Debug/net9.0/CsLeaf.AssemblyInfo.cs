@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CsLeaf")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+58ea669be4541b06fc19695284d5e40c12a9bc91")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+347f970cab6f0b5c6c546308dd2f5168838970ce")]
 [assembly: System.Reflection.AssemblyProductAttribute("CsLeaf")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CsLeaf")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

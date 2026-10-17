@@ -52,7 +52,7 @@ process.on("exit", () => { try { rmSync(tmpDir, { recursive: true, force: true }
 
 const runners = {
   py: async (recordJson) => {
-    writeFileSync(`${tmpDir}/_py_in.json`, "[" + recordJson + "]");
+    writeFileSync(`${tmpDir}/_py_in.json`, recordJson);
     const r = spawnSync("python3", ["-c", `
 import sys, json
 import os; sys.path.insert(0, os.environ.get('GITPP_DOCTOR_DIR', '/tmp/gitpp-doctor'))
@@ -63,19 +63,19 @@ import gitpp_doctor
 # different value for a different leaf. Testing the runner's idea of decoding
 # instead of the port's is how 724818294626474393600 diverged while the
 # suite kept reporting disagreement after the port was already fixed.
-record = gitpp_doctor.loads(open('${tmpDir}/_py_in.json').read())[0]
-print(gitpp_doctor.record_leaf(record))
+for record in gitpp_doctor.loads(open('${tmpDir}/_py_in.json').read()):
+    print(gitpp_doctor.record_leaf(record))
 `], { encoding: "utf8", timeout: 60000, env: process.env });
     if (r.status !== 0) throw new Error(r.stderr || r.stdout);
     return r.stdout.trim();
   },
   js: async (recordJson) => {
-    writeFileSync(`${tmpDir}/_js_in.json`, "[" + recordJson + "]");
+    writeFileSync(`${tmpDir}/_js_in.json`, recordJson);
     const r = spawnSync("node", ["-e", `
 import(process.env.GITPP_JS || "/tmp/gitpp-js/src/gitpp.js").then(async (mod) => {
   const fs = await import("node:fs");
   const records = JSON.parse(fs.readFileSync("${tmpDir}/_js_in.json", "utf8"));
-  console.log(await mod.recordLeaf(records[0]));
+  for (const r of records) console.log(await mod.recordLeaf(r));
 });
 `], { encoding: "utf8", timeout: 60000, env: process.env });
     if (r.status !== 0) throw new Error(r.stderr || r.stdout);
@@ -83,7 +83,7 @@ import(process.env.GITPP_JS || "/tmp/gitpp-js/src/gitpp.js").then(async (mod) =>
   },
   cs: async (recordJson) => {
     const r = spawnSync("dotnet", [join(ROOT, "CsLeaf/bin/Debug/net9.0/CsLeaf.dll")], {
-      input: "[" + recordJson + "]",
+      input: recordJson,
       encoding: "utf8",
       timeout: 60000,
       env: { ...process.env, HOME: "/tmp/fake-home" },
@@ -93,7 +93,7 @@ import(process.env.GITPP_JS || "/tmp/gitpp-js/src/gitpp.js").then(async (mod) =>
   },
   pl: async (recordJson) => {
     const r = spawnSync("perl", [join(ROOT, "wrappers/PlLeaf.pl")], {
-      input: "[" + recordJson + "]",
+      input: recordJson,
       encoding: "utf8",
       timeout: 60000,
     });
@@ -102,7 +102,7 @@ import(process.env.GITPP_JS || "/tmp/gitpp-js/src/gitpp.js").then(async (mod) =>
   },
   c: async (recordJson) => {
     const r = spawnSync(join(ROOT, "CLleaf"), [], {
-      input: "[" + recordJson + "]",
+      input: recordJson,
       encoding: "utf8",
       timeout: 60000,
     });
@@ -118,21 +118,28 @@ const start = Date.now();
 const results = [];
 let i = 0;
 
-for (let i = 0; i < recordJsonStrings.length; i++) {
-  const recJson = recordJsonStrings[i];
-  const id = recordIds[i];
-  const row = { id, ports: {} };
-  for (const p of ports) {
-    try {
-      const leaf = await runners[p](recJson);
-      row.ports[p] = leaf;
-    } catch (e) {
-      row.ports[p] = `ERR: ${e.message.slice(0, 100)}`;
-    }
+// BATCHED. Spawning five processes PER RECORD is 100,215 process starts for
+// a 20,043-record corpus, at ~0.55s/record -- 3 hours. The per-record spawn
+// is the entire cost; the ports themselves are microseconds. Chunking turns
+// that into 5 x (N/BATCH) starts. A batch of 250 turns 3 hours into ~90s.
+const BATCH = parseInt(process.env.FUZZ_BATCH || "250", 10);
+
+for (let b = 0; b < recordJsonStrings.length; b += BATCH) {
+  const chunk = recordJsonStrings.slice(b, b + BATCH);
+  const payload = "[" + chunk.join(",") + "]";
+  const leaves = {};
+  for (const [name, run] of Object.entries(runners)) {
+    leaves[name] = (await run(payload)).split("\n").filter(Boolean);
   }
-  results.push(row);
-  if ((i+1) % 1000 === 0) console.log(`  ${i+1}/${recordJsonStrings.length}`);
+  for (let k = 0; k < chunk.length; k++) {
+    const row = { id: `idx:${b + k}`, ports: {} };
+    for (const name of Object.keys(runners)) row.ports[name] = leaves[name][k] ?? "MISSING";
+    results.push(row);
+  }
+  const agree = results.filter((r) => new Set(Object.values(r.ports)).size === 1).length;
+  console.log(`  ${Math.min(b + BATCH, recordJsonStrings.length)}/${recordJsonStrings.length}  ${agree} agree`);
 }
+
 
 const elapsed = ((Date.now() - start) / 1000).toFixed(1);
 

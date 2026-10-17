@@ -1,7 +1,15 @@
-using System; using System.IO; using System.Text.Json; using System.Threading.Tasks; using Gitpp;
+using System;
+using System.IO;
+using System.Text;
+using System.Text.Json;
+using Gitpp;
+
 class Program {
   static async Task Main() {
     var json = await Console.In.ReadToEndAsync();
-    foreach (var r in Gitpp.Numbers.ParseRecords(json)) Console.WriteLine(Fold.RecordLeaf(r));
+    var records = Gitpp.Numbers.ParseRecords(json);
+    var sb = new StringBuilder();
+    foreach (var r in records) sb.AppendLine(Fold.RecordLeaf(r));
+    Console.Write(sb.ToString());
   }
 }
