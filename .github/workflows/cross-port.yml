@@ -1,0 +1,47 @@
+name: cross-port equivalence
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  equivalence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The live deployment returns 503 intermittently, so the fetch is
+      # retried. And NuGet.Config on a shared runner can be unusable, so
+      # the dotnet home is pinned to a writable path.
+      DOTNET_CLI_HOME: /tmp/dnhome
+      NUGET_PACKAGES: /tmp/nugetpkgs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '9.0.x' }
+      - name: populate the ports and the corpus
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./setup.sh
+      - name: the ports must all be present
+        # A participant that cannot run must be a FAILURE, not a silently
+        # smaller set: a run over four ports reports the same pass count
+        # as a run over five.
+        run: |
+          test -x ports/c/gitpp
+          test -f ports/python/gitpp_doctor.py
+          test -f ports/javascript/bin/gitpp-js
+          test -f ports/csharp/Test.dll
+          test -x ports/perl/gitpp-pl
+          test -f ports/lib/Gitpp.pm
+          test -d cases
+          n=$(find cases -name '*.json' | wc -l)
+          echo "  $n case(s) in the corpus"
+          test "$n" -ge 28
+      - name: every port must produce the same closure root
+        run: node run.mjs

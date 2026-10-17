@@ -1,130 +1,61 @@
-import { spawn, spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs";
-import { join, basename } from "node:path";
+#!/usr/bin/env bash
+# setup.sh -- populate the ports/ and cases/ trees that run.mjs expects.
+#
+# This file used to be a JavaScript program with a .sh extension: a
+# near-copy of run.mjs with a live fetch added. It could not bootstrap
+# anything -- neither run.mjs nor setup.sh created ports/ or cases/ --
+# so the repository could not run itself. That is why it had no CI:
+# there was nothing that could be automated.
+#
+# Usage:  ./setup.sh
+# Then:   node run.mjs
+set -euo pipefail
 
-const CASES = "./cases";
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
 
-async function* walk(dir) {
-  for (const e of await import("node:fs/promises").then(m => m.readdir(dir, { withFileTypes: true }))) {
-    const full = join(dir, e.name);
-    if (e.isDirectory()) yield* walk(full);
-    else if (e.name.endsWith(".json")) yield full;
-  }
+# The ports, as SIBLINGS under ports/. The paths here match run.mjs
+# exactly, and the perl wrapper resolves its module from ports/lib.
+clone() { # <repo> <dest>
+  if [ -d "$2" ]; then echo "  have $2"; return; fi
+  echo "  clone $1 -> $2"
+  git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN:?set GITHUB_TOKEN}@github.com/SuperInstance/$1.git" "$2"
 }
 
-async function fetchLive() {
-  const r = await fetch("https://gitpp.superinstance.dev/api/records?project=poc-quilt-1");
-  if (!r.ok) throw new Error("fetch failed");
-  return (await r.json()).records;
-}
+mkdir -p ports
+clone gitpp-c            ports/c
+clone git.pp-doctor      ports/python
+clone gitpp-js           ports/javascript
+clone gitpp-cs          ports/csharp
+clone gitpp-pl           ports/perl
 
-const INP = "/tmp/cross-port-bench/_input.json";
-mkdirSync("/tmp/cross-port-bench", { recursive: true });
+# The perl port's module lives in lib/, but run.mjs invokes
+# ports/perl/gitpp-pl, whose `use lib "../lib"` resolves to ports/lib.
+cp -r ports/perl/lib ports/lib 2>/dev/null || true
+cp -r ports/perl/bin/gitpp-pl ports/perl/gitpp-pl
+chmod +x ports/perl/gitpp-pl
 
-function runSync(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, { encoding: "utf8", timeout: 30000, ...opts });
-  if (r.status !== 0) {
-    throw new Error(`exit ${r.status}: ${(r.stderr || r.stdout || "").slice(0, 200)}`);
-  }
-  return r.stdout;
-}
+# Build the C port FROM SOURCE. The repo ships a prebuilt binary and a
+# stale one would test the wrong build.
+if [ -f ports/c/Makefile ]; then
+  echo "  build ports/c"
+  ( cd ports/c && make clean >/dev/null 2>&1 || true; make >/dev/null )
+  export GITPP_C_BIN="$ROOT/ports/c/gitpp"
+fi
 
-const runners = {
-  c: async (records, at) => {
-    const INP = "./_input_c.json";
-    writeFileSync(INP, JSON.stringify(records));
-    const out = runSync("./ports/c/gitpp", [INP, "--at", at]);
-    const j = JSON.parse(out);
-    return j.closureRoot;
-  },
-  py: async (records, at) => {
-    writeFileSync(INP, JSON.stringify(records));
-    const out = runSync("python3", ["./ports/python/gitpp_doctor.py", "explain", INP, "--at", at]);
-    const j = JSON.parse(out);
-    return j.closureRoot;
-  },
-  js: async (records, at) => {
-    writeFileSync(INP, JSON.stringify(records));
-    const out = runSync("node", ["./ports/javascript/bin/gitpp-js", INP, "--at", at]);
-    const j = JSON.parse(out);
-    return j.closureRoot;
-  },
-  cs: async (records, at) => {
-    writeFileSync(INP, JSON.stringify(records));
-    const out = runSync("dotnet", ["./ports/csharp/Test.dll", INP, "--at", at], { 
-      env: { ...process.env, HOME: "/tmp/fake-home" } 
-    });
-    const j = JSON.parse(out);
-    return j.closureRoot;
-  },
-  pl: async (records, at) => {
-    writeFileSync(INP, JSON.stringify(records));
-    const out = runSync("perl", ["./ports/perl/gitpp-pl", INP, "--at", at]);
-    const j = JSON.parse(out);
-    return j.closureRoot;
-  }
-};
+# Build the C# port. run.mjs invokes `dotnet ports/csharp/Test.dll`,
+# which needs the whole output directory beside it -- the runtimeconfig
+# and the sibling assemblies -- not just the one dll.
+if command -v dotnet >/dev/null 2>&1; then
+  echo "  build ports/csharp"
+  ( cd ports/csharp && dotnet build test/Test.csproj -c Release -o "$ROOT/ports/csharp" >/dev/null )
+fi
 
-const ports = ["c", "py", "js", "cs", "pl"];
-const live = await fetchLive();
+# The corpus.
+if [ ! -d cases ]; then
+  echo "  clone the corpus"
+  git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN:?set GITHUB_TOKEN}@github.com/SuperInstance/gitpp-conformance.git" .conformance
+  cp -r .conformance/cases cases
+fi
 
-const cases = [];
-for await (const f of walk(CASES)) {
-  cases.push({ file: f, name: basename(f, ".json"), json: JSON.parse(readFileSync(f, "utf8")) });
-}
-
-console.log(`Running ${cases.length} cases across ${ports.length} ports (${ports.join(", ")})...`);
-const results = [];
-for (const c of cases) {
-  let records = c.json.input_tampered || c.json.input;
-  if (!records && c.json.input_source === "live") records = live;
-  if (!records) continue;
-  const row = { name: c.name, at: c.json.at, ports: {} };
-  for (const p of ports) {
-    try {
-      const root = await runners[p](records, c.json.at);
-      row.ports[p] = { ok: true, root };
-    } catch (e) {
-      row.ports[p] = { ok: false, err: String(e.message).slice(0, 200) };
-    }
-  }
-  results.push(row);
-}
-
-writeFileSync("/tmp/cross-port-bench/results.json", JSON.stringify(results, null, 2));
-
-let allAgree = 0, disagree = 0, errors = 0;
-for (const r of results) {
-  const roots = Object.values(r.ports).filter(p => p.ok).map(p => p.root);
-  const uniqueRoots = [...new Set(roots)];
-  if (uniqueRoots.length === 1) {
-    allAgree++;
-  } else if (roots.length < ports.length) {
-    errors++;
-  } else {
-    disagree++;
-  }
-}
-console.log(`\nAgreement: ${allAgree} all-agree, ${disagree} disagree, ${errors} some-error`);
-
-if (disagree > 0) {
-  console.log("\nDisagreements:");
-  for (const r of results) {
-    const roots = Object.values(r.ports).filter(p => p.ok).map(p => p.root);
-    if (new Set(roots).size > 1) {
-      console.log(`  ${r.name} (at ${r.at}):`);
-      for (const [p, data] of Object.entries(r.ports)) {
-        console.log(`    ${p}: ${data.ok ? data.root : `ERR: ${data.err}`}`);
-      }
-    }
-  }
-}
-
-if (errors > 0) {
-  console.log("\nErrors:");
-  for (const r of results) {
-    for (const [p, data] of Object.entries(r.ports)) {
-      if (!data.ok) console.log(`  ${r.name} on ${p}: ${data.err}`);
-    }
-  }
-}
+echo "  ready: $(find cases -name '*.json' | wc -l) case(s)"
