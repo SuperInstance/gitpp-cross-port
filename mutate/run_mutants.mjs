@@ -48,22 +48,54 @@ for record in gitpp_doctor.loads(sys.stdin.read()):
     return out.join("\n");
   },
   c: (json) => {
+    // CLleaf reads the record array on STDIN and prints one leaf per line.
+    // Spool to a file and pass '@path': a single argv entry is capped at
+    // MAX_ARG_STRLEN (128 KiB), so passing a whole batch as an argument
+    // killed this port with E2BIG, and spawnSync reports E2BIG as status
+    // null, which the harness logged as a crash.
     const inPath = `${tmpDir}/_c_in.json`;
     const outPath = `${tmpDir}/_c_out.txt`;
     writeFileSync(inPath, json);
     run("node", [join(ROOT, "cleaf.mjs"), `@${inPath}`, outPath]);
     return readFileSync(outPath, "utf8");
   },
+  cs: (json) => {
+    // The C# leaf wrapper. The dll is built by setup.sh; if it is absent
+    // this throws, and the harness records the port as ERRORED rather
+    // than counting it as agreement.
+    const r = spawnSync("dotnet", [join(ROOT, "CsLeaf/bin/Debug/net9.0/CsLeaf.dll")], {
+      input: json, encoding: "utf8", timeout: 60000,
+      env: { ...process.env, HOME: process.env.GITPP_FAKE_HOME || "/tmp/fake-home" },
+    });
+    if (r.status !== 0) throw new Error(`cs: ${(r.stderr || r.stdout || "").slice(0, 160)}`);
+    return r.stdout.trim();
+  },
+  pl: (json) => {
+    const r = spawnSync("perl", [join(ROOT, "wrappers/PlLeaf.pl")], {
+      input: json, encoding: "utf8", timeout: 60000,
+    });
+    if (r.status !== 0) throw new Error(`pl: ${(r.stderr || r.stdout || "").slice(0, 160)}`);
+    return r.stdout.trim();
+  },
 };
 
 const mutants = JSON.parse(readFileSync(process.argv[2], "utf8"));
 const names = Object.keys(runners);
 const BATCH = parseInt(process.env.MUT_BATCH || "250", 10);
-// The C port's \uXXXX defect (gitpp-c#1) is UNFIXED, so it disagrees on
-// every escape-injection mutant by design. Comparing against it would
-// report a known defect as a new one on 14,611 mutants and bury the
-// signal. It is listed for visibility and excluded from the verdict.
-const COMPARED = names.filter((n) => n !== "c");
+// Every port participates.
+//
+// The C port was EXCLUDED from the verdict while gitpp-c#1 was open,
+// because its \uXXXX defect made it disagree on every escape-injection
+// mutant by design -- and reporting a known defect as a new one on
+// 14,611 mutants buries the signal. That exclusion is the right call
+// while the bug is open, and the wrong call once it is fixed.
+//
+// Set MUT_EXCLUDE=c to reproduce the old behaviour, and note that the
+// run will then show 14,611 disagreements from the known defect alone.
+const COMPARED = (process.env.MUT_EXCLUDE || "")
+  .split(",").map((s) => s.trim()).filter(Boolean).length
+  ? names.filter((n) => !(process.env.MUT_EXCLUDE || "").split(",").map((s) => s.trim()).includes(n))
+  : names;
 
 let agree = 0, disagree = 0, errors = 0;
 const disagreements = [];

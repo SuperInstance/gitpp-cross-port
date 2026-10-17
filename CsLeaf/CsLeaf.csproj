@@ -1,6 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework>
   <ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable>
+    <!-- The gitpp-cs checkout, resolved at build time rather than
+         hardcoded. /tmp/gitpp-cs exists on exactly one machine, so this
+         project only built there, and the failure surfaced as "the cs
+         participant could not load" rather than as a build error.
+         GitppCsProj overrides it; GITPP_CS_DIR is the environment
+         friendly form. Note: an XML comment may not contain a double
+         hyphen, which is a tedious way to lose an afternoon. -->
+    <GitppCsProj Condition="'$(GitppCsProj)'=='' AND '$(GITPP_CS_DIR)'!=''">$(GITPP_CS_DIR)/src/Gitpp.csproj</GitppCsProj>
+    <GitppCsProj Condition="'$(GitppCsProj)'=='' AND Exists('../../gitpp-cs/src/Gitpp.csproj')">$(MSBuildThisFileDirectory)../../gitpp-cs/src/Gitpp.csproj</GitppCsProj>
     <GitppCsProj Condition="'$(GitppCsProj)'==''">/tmp/gitpp-cs/src/Gitpp.csproj</GitppCsProj>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="$(GitppCsProj)" /></ItemGroup>
