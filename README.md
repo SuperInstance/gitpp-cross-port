@@ -1,10 +1,10 @@
 # gitpp-cross-port
 
-> The byte-level cross-port equivalence test. Runs the same 30 cases through 4 ports and proves they produce identical closure roots. The "byte-equivalence" of a fold is the strongest possible conformance — the ports are interchangeable.
+> The byte-level cross-port equivalence test. Runs the same 30 cases through 5 ports and proves they produce identical closure roots. The "byte-equivalence" of a fold is the strongest possible conformance — the ports are interchangeable.
 
 ## What this is
 
-This is a permanent artifact of the [git.pp fold ports](../git.pp-spec) ecosystem. The four ports are:
+This is a permanent artifact of the [git.pp fold ports](../git.pp-spec) ecosystem. The five ports are:
 
 | Port | Lang | Stdlib only | Source |
 |------|------|-------------|--------|
@@ -14,7 +14,7 @@ This is a permanent artifact of the [git.pp fold ports](../git.pp-spec) ecosyste
 | **C#** (5th) | C# / .NET 9 | yes | [SuperInstance/gitpp-cs](https://github.com/SuperInstance/gitpp-cs) |
 | **Perl** (6th) | Perl 5.36 | yes | [SuperInstance/gitpp-pl](https://github.com/SuperInstance/gitpp-pl) |
 
-All 4 ports are written from the spec v0.3.0 alone (doc-only discipline: zero reads of the other ports). They diverge only in the implementation language; the byte output of the fold is identical.
+All 5 ports are written from the spec v0.3.0 alone (doc-only discipline: zero reads of the other ports). They diverge only in the implementation language; the byte output of the fold is identical.
 
 ## How to run
 
@@ -45,7 +45,7 @@ Plus **4 pinned cross-port leaf verification cases** from `git.pp-spec/cross-por
 60effe23970d8a5cc837636c44685502361288c1f00577e9addfa10cbd4fc91d
 ```
 
-This is the closure root at `poc-quilt-1@task-c`, computed from the live 8-record set in `https://gitpp.superinstance.dev`. All 4 ports produce this exact hash. The hub (TypeScript) and the Elixir port also produce it, but those aren't in this repo.
+This is the closure root at `poc-quilt-1@task-c`, computed from the live 8-record set in `https://gitpp.superinstance.dev`. All 5 ports produce this exact hash. The hub (TypeScript) and the Elixir port also produce it, but those aren't in this repo.
 
 ## Bugs found and fixed
 
@@ -83,7 +83,7 @@ If two ports produce different bytes for the same input, one of them is wrong. T
 For a fold, this matters because:
 - **A receipt is a hash.** If the same record set can be folded to different closure roots depending on the language you ask, the receipt is not portable.
 - **Cross-organisation verification.** A witness from a Python tool can be checked by a JS tool. A C# build can be signed by a Perl auditor. Same bytes in, same bytes out.
-- **Specification validation.** If 4 ports written from prose alone agree byte-for-byte, the spec is normative — not just a tutorial.
+- **Specification validation.** If 5 ports written from prose alone agree byte-for-byte, the spec is normative — not just a tutorial.
 
 ## What's NOT tested
 
@@ -93,7 +93,7 @@ For a fold, this matters because:
 
 ## Pass criterion
 
-**30/30 closure roots byte-for-byte equivalent across all 4 ports.** Plus 4/4 pinned cross-port leaves match. No exceptions. If a port produces a different byte, that's a bug — in the port, not in this test.
+**30/30 closure roots byte-for-byte equivalent across all 5 ports.** Plus 4/4 pinned cross-port leaves match. No exceptions. If a port produces a different byte, that's a bug — in the port, not in this test.
 
 ## License
 
