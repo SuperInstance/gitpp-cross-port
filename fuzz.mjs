@@ -55,7 +55,19 @@ const runners = {
     writeFileSync(`${tmpDir}/_py_in.json`, recordJson);
     const r = spawnSync("python3", ["-c", `
 import sys, json
-import os; sys.path.insert(0, os.environ.get('GITPP_DOCTOR_DIR', '/tmp/gitpp-doctor'))
+# The default is RELATIVE to this suite's own directory, which is the
+# working directory the suite is run from. The python port is a SIBLING
+# of this repository, so '../gitpp-doctor' is the port.
+#
+# It used to be the absolute path /tmp/gitpp-doctor, which exists on
+# exactly one machine -- and in CI it does not, so the python
+# participant raised
+#
+#     ModuleNotFoundError: No module named 'gitpp_doctor'
+#
+# and the leaf suite ran without it. A run over four ports reports the
+# same pass count as a run over five.
+import os, sys; sys.path.insert(0, os.path.abspath(os.environ.get('GITPP_DOCTOR_DIR', '../gitpp-doctor')))
 import gitpp_doctor
 # Use the port's own decode entry point, NOT raw json.load. The port parses
 # every JSON number into the float64 domain (parse_int=float); raw json.load
