@@ -20,6 +20,7 @@
 // makes that difference demonstrable rather than asserted.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
@@ -35,13 +36,23 @@ function run(cmd, args, input, extraEnv = {}) {
 const runners = {
   py: (json) => run("python3", ["-c", `
 import sys, json, os
-sys.path.insert(0, os.environ.get('GITPP_DOCTOR_DIR', '/tmp/gitpp-doctor'))
+# The default is RELATIVE to this repo: the python port is a SIBLING.
+# It used to be the absolute path /tmp/gitpp-doctor, which exists on
+# exactly one machine -- and in CI it does not, so the python port
+# silently did not participate, and a run over four ports reports the
+# same pass count as a run over five.
+sys.path.insert(0, os.path.abspath(os.environ.get('GITPP_DOCTOR_DIR', '../gitpp-doctor')))
 import gitpp_doctor
 for record in gitpp_doctor.loads(sys.stdin.read()):
     print(gitpp_doctor.record_leaf(record))
 `], json),
   js: async (json) => {
-    const mod = await import(process.env.GITPP_JS || "/tmp/gitpp-js/src/gitpp.js");
+    // The default is RELATIVE to this repo: the js port is a SIBLING.
+    // The absolute path /tmp/gitpp-js/src/gitpp.js exists on exactly one
+    // machine, and on that machine it held a DIFFERENT build.
+    const mod = await import(process.env.GITPP_JS
+      ? pathToFileURL(process.env.GITPP_JS).href
+      : pathToFileURL(join(ROOT, "..", "gitpp-js", "src", "gitpp.js")).href);
     const recs = JSON.parse(json);
     const out = [];
     for (const r of recs) out.push(await mod.recordLeaf(r));
@@ -63,7 +74,18 @@ for record in gitpp_doctor.loads(sys.stdin.read()):
     // The C# leaf wrapper. The dll is built by setup.sh; if it is absent
     // this throws, and the harness records the port as ERRORED rather
     // than counting it as agreement.
-    const r = spawnSync("dotnet", [join(ROOT, "CsLeaf/bin/Debug/net9.0/CsLeaf.dll")], {
+    // The dll is looked for in BOTH configurations, because a local
+    // `dotnet build` with no -c produces Debug and the workflow builds
+    // Release -- and a hardcoded path means the port can never run in
+    // one of them.
+    const cfgs = ["Debug", "Release"];
+    let dll = null;
+    for (const c of cfgs) {
+      const p = join(ROOT, "CsLeaf/bin", c, "net9.0", "CsLeaf.dll");
+      if (existsSync(p)) { dll = p; break; }
+    }
+    if (!dll) throw new Error("cs: CsLeaf.dll is not built. Run setup-mutate.sh.");
+    const r = spawnSync("dotnet", [dll], {
       input: json, encoding: "utf8", timeout: 60000,
       env: { ...process.env, HOME: process.env.GITPP_FAKE_HOME || "/tmp/fake-home" },
     });
