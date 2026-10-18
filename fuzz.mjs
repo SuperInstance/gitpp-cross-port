@@ -72,7 +72,22 @@ for record in gitpp_doctor.loads(open('${tmpDir}/_py_in.json').read()):
   js: async (recordJson) => {
     writeFileSync(`${tmpDir}/_js_in.json`, recordJson);
     const r = spawnSync("node", ["-e", `
-import(process.env.GITPP_JS || "/tmp/gitpp-js/src/gitpp.js").then(async (mod) => {
+// The port is resolved at RUN time, and the fallback is RELATIVE to
+// this file -- the js port is a SIBLING of this repository.
+//
+// It used to be the absolute path /tmp/gitpp-js/src/gitpp.js, which
+// exists on exactly one machine. Two consequences:
+//
+//   * in CI that path does not exist, so the js participant could not
+//     load, and the leaf suite ran with four ports and reported the
+//     same pass count as a run with five;
+//   * on a developer machine it DID exist, and it held a DIFFERENT
+//     build, so the participant quietly tested code that was not the
+//     code under test.
+//
+// The same reasoning as the perl leaf wrapper, the CsLeaf project
+// reference, and the oracle's GITPP_C_BIN.
+import(process.env.GITPP_JS || new URL("../gitpp-js/src/gitpp.js", import.meta.url).pathname).then(async (mod) => {
   const fs = await import("node:fs");
   const records = JSON.parse(fs.readFileSync("${tmpDir}/_js_in.json", "utf8"));
   for (const r of records) console.log(await mod.recordLeaf(r));
