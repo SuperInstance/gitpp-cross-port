@@ -1,20 +1,21 @@
 {
   "format": 1,
   "restore": {
-    "/tmp/gitpp-cross-port/CsLeaf/CsLeaf.csproj": {}
+    "/tmp/xpv/CsLeaf/CsLeaf.csproj": {}
   },
   "projects": {
-    "/tmp/gitpp-cross-port/CsLeaf/CsLeaf.csproj": {
+    "/tmp/ports/gitpp-cs/src/Gitpp.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/tmp/gitpp-cross-port/CsLeaf/CsLeaf.csproj",
-        "projectName": "CsLeaf",
-        "projectPath": "/tmp/gitpp-cross-port/CsLeaf/CsLeaf.csproj",
-        "packagesPath": "/tmp/fake-home/.nuget/packages/",
-        "outputPath": "/tmp/gitpp-cross-port/CsLeaf/obj/",
+        "projectUniqueName": "/tmp/ports/gitpp-cs/src/Gitpp.csproj",
+        "projectName": "Gitpp",
+        "projectPath": "/tmp/ports/gitpp-cs/src/Gitpp.csproj",
+        "packagesPath": "/tmp/nugetpkgs",
+        "outputPath": "/tmp/ports/gitpp-cs/src/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/tmp/fake-home/.nuget/NuGet/NuGet.Config"
+          "/tmp/ports/gitpp-cs/NuGet.Config",
+          "/tmp/dotnethome/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net9.0"
@@ -25,11 +26,7 @@
         "frameworks": {
           "net9.0": {
             "targetAlias": "net9.0",
-            "projectReferences": {
-              "/tmp/gitpp-cs/src/Gitpp.csproj": {
-                "projectPath": "/tmp/gitpp-cs/src/Gitpp.csproj"
-              }
-            }
+            "projectReferences": {}
           }
         },
         "warningProperties": {
@@ -67,18 +64,17 @@
         }
       }
     },
-    "/tmp/gitpp-cs/src/Gitpp.csproj": {
+    "/tmp/xpv/CsLeaf/CsLeaf.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/tmp/gitpp-cs/src/Gitpp.csproj",
-        "projectName": "Gitpp",
-        "projectPath": "/tmp/gitpp-cs/src/Gitpp.csproj",
-        "packagesPath": "/tmp/fake-home/.nuget/packages/",
-        "outputPath": "/tmp/gitpp-cs/src/obj/",
+        "projectUniqueName": "/tmp/xpv/CsLeaf/CsLeaf.csproj",
+        "projectName": "CsLeaf",
+        "projectPath": "/tmp/xpv/CsLeaf/CsLeaf.csproj",
+        "packagesPath": "/tmp/nugetpkgs",
+        "outputPath": "/tmp/xpv/CsLeaf/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/tmp/gitpp-cs/NuGet.Config",
-          "/tmp/fake-home/.nuget/NuGet/NuGet.Config"
+          "/tmp/dotnethome/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net9.0"
@@ -89,7 +85,11 @@
         "frameworks": {
           "net9.0": {
             "targetAlias": "net9.0",
-            "projectReferences": {}
+            "projectReferences": {
+              "/tmp/ports/gitpp-cs/src/Gitpp.csproj": {
+                "projectPath": "/tmp/ports/gitpp-cs/src/Gitpp.csproj"
+              }
+            }
           }
         },
         "warningProperties": {

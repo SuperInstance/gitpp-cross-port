@@ -113,7 +113,13 @@ import(process.env.GITPP_JS || new URL("../gitpp-js/src/gitpp.js", import.meta.u
       input: recordJson,
       encoding: "utf8",
       timeout: 60000,
-      env: { ...process.env, HOME: "/tmp/fake-home" },
+      // A fake HOME, so the port cannot pick up a stray dotfile. It is
+      // applied on TOP of the real environment rather than replacing it,
+      // which is what a spread of process.env already did -- the spread
+      // was correct, but the fake HOME alone meant the port could not
+      // see GITPP_* overrides, and a reader that could not see its
+      // overrides silently fell back to a hardcoded path.
+      env: { ...process.env, HOME: process.env.GITPP_FAKE_HOME || "/tmp/fake-home" },
     });
     if (r.status !== 0) throw new Error(r.stderr || r.stdout);
     return r.stdout.trim();

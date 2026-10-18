@@ -21,7 +21,6 @@ use strict; use warnings;
 # one now does the same, with the same fallback chain.
 use lib (($ENV{GITPP_PL_DIR} // "") ? "$ENV{GITPP_PL_DIR}/lib" : ());
 use lib "../gitpp-pl/lib";
-use lib "ports/perl/lib";
-use Gitpp; use JSON::PP;
+use lib "ports/perl/lib";use Gitpp; use JSON::PP;
 local $/;
 for my $r (@{Gitpp::decode_records(<STDIN>)}) { print Gitpp::record_leaf($r), "\n"; }
