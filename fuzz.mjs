@@ -55,7 +55,19 @@ const runners = {
     writeFileSync(`${tmpDir}/_py_in.json`, recordJson);
     const r = spawnSync("python3", ["-c", `
 import sys, json
-import os; sys.path.insert(0, os.environ.get('GITPP_DOCTOR_DIR', '/tmp/gitpp-doctor'))
+# The default is RELATIVE to this suite's own directory, which is the
+# working directory the suite is run from. The python port is a SIBLING
+# of this repository, so '../gitpp-doctor' is the port.
+#
+# It used to be the absolute path /tmp/gitpp-doctor, which exists on
+# exactly one machine -- and in CI it does not, so the python
+# participant raised
+#
+#     ModuleNotFoundError: No module named 'gitpp_doctor'
+#
+# and the leaf suite ran without it. A run over four ports reports the
+# same pass count as a run over five.
+import os, sys; sys.path.insert(0, os.path.abspath(os.environ.get('GITPP_DOCTOR_DIR', '../gitpp-doctor')))
 import gitpp_doctor
 # Use the port's own decode entry point, NOT raw json.load. The port parses
 # every JSON number into the float64 domain (parse_int=float); raw json.load
@@ -72,7 +84,22 @@ for record in gitpp_doctor.loads(open('${tmpDir}/_py_in.json').read()):
   js: async (recordJson) => {
     writeFileSync(`${tmpDir}/_js_in.json`, recordJson);
     const r = spawnSync("node", ["-e", `
-import(process.env.GITPP_JS || "/tmp/gitpp-js/src/gitpp.js").then(async (mod) => {
+// The port is resolved at RUN time, and the fallback is RELATIVE to
+// this file -- the js port is a SIBLING of this repository.
+//
+// It used to be the absolute path /tmp/gitpp-js/src/gitpp.js, which
+// exists on exactly one machine. Two consequences:
+//
+//   * in CI that path does not exist, so the js participant could not
+//     load, and the leaf suite ran with four ports and reported the
+//     same pass count as a run with five;
+//   * on a developer machine it DID exist, and it held a DIFFERENT
+//     build, so the participant quietly tested code that was not the
+//     code under test.
+//
+// The same reasoning as the perl leaf wrapper, the CsLeaf project
+// reference, and the oracle's GITPP_C_BIN.
+import(process.env.GITPP_JS || new URL("../gitpp-js/src/gitpp.js", import.meta.url).pathname).then(async (mod) => {
   const fs = await import("node:fs");
   const records = JSON.parse(fs.readFileSync("${tmpDir}/_js_in.json", "utf8"));
   for (const r of records) console.log(await mod.recordLeaf(r));
