@@ -144,7 +144,29 @@ for (let b = 0; b < mutants.length; b += BATCH) {
 }
 
 console.log(`\n  ${agree} agree, ${disagree} disagree, ${errors} errors (of ${mutants.length})`);
-console.log("  compared ports: " + COMPARED.join(", ") + "  (C excluded: gitpp-c#1 is unfixed)");
+// Which ports were actually compared, and WHY.
+//
+// The old line was a hardcoded parenthetical:
+//
+//   compared ports: py, js, c, cs, pl  (C excluded: gitpp-c#1 is unfixed)
+//
+// so it claimed the C port was excluded WHILE LISTING IT. The claim
+// outlived the fact it described: gitpp-c#1 is fixed and merged, the
+// C port participates, and the line was still announcing the old
+// state.
+//
+// A summary that states a fact which is no longer true is worse than
+// no summary, because a reader trusts it.
+const excluded = names.filter((n) => !COMPARED.includes(n));
+console.log("  compared ports: " + COMPARED.join(", "));
+if (excluded.length) {
+  console.log("  EXCLUDED: " + excluded.join(", ") +
+    (excluded.includes("c")
+      ? " -- the C port is excluded, so a C defect will NOT be reported here"
+      : ""));
+} else {
+  console.log("  every port participated. A defect in ANY port would have been reported here.");
+}
 if (disagreements.length) {
   console.log("\n  first disagreements:");
   for (const d of disagreements.slice(0, 8)) {
