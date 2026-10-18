@@ -24,16 +24,48 @@ node run.mjs
 
 Requires: Node 22+, Python 3, .NET 9, Perl 5.36. The runner spawns each port's CLI as a subprocess and compares the closure roots.
 
-## Receipt: 30/30 closure roots byte-for-byte equivalent
+## Receipt: 28/28 comparable closure roots byte-for-byte equivalent
+
+Verbatim output of `node run.mjs` after `./setup.sh` (all five ports built
+from source, corpus cloned, exit code 0):
 
 ```
 $ node run.mjs
-Running 30 cases across 5 ports (c, python, javascript, csharp, perl)...
+Running 30 cases across 5 ports (c, py, js, cs, pl)...
 
-Agreement: 30 all-agree, 0 disagree, 0 some-error
+Agreement: 28 all-agree, 0 disagree, 0 some-error
+Skipped: 2 case(s) were never tested (all known gaps)
+  known gap  grown-closure: corpus case carries a prose input_modification and no input_tampered (known gap; the corpus's own runner skips it too)
+  known gap  state-only: corpus case carries a prose input_modification and no input_tampered (known gap; the corpus's own runner skips it too)
+
+OK: every port answered every case and every case agreed.
 ```
 
-The 30 cases are:
+**Read the two numbers together: 28 all-agree out of 30 discovered cases.**
+The corpus contains 30 cases; 2 of them cannot be run by any runner, so
+`all-agree` cannot exceed 28. `run.mjs` enforces this itself —
+`MIN_TESTABLE_CASES = 28`, and it fails the run if the all-agree count does
+not equal the number of compared cases. The `Skipped:` block is therefore not
+optional detail; it is the line that says *which* cases the 30 does and does
+not cover.
+
+### What is excluded, and why
+
+`L2/grown-closure` and `V1/state-only` carry an `input_modification`
+described in prose ("Add a new record `predecessor-1` that `override-1` now
+depends on") and no `input_tampered` payload, so there is no machine-readable
+input to feed the ports. The conformance corpus's own runner skips these two
+for the same reason, with the note *"Not yet implemented; case authors should
+provide input_tampered instead."* They are listed by name rather than dropped
+silently, and an **un**recognised skip is treated as a failure — only these
+two known gaps are tolerated.
+
+An earlier version of this section claimed `30 all-agree` and omitted the
+`Skipped:` lines. That receipt could not have come from this runner: with 2
+cases skipped, `allAgree` is only ever incremented for compared cases, so the
+maximum reachable value is 28.
+
+The 30 discovered cases are:
 - **28 conformance cases** from [SuperInstance/gitpp-conformance](https://github.com/SuperInstance/gitpp-conformance) — the public corpus.
 - **2 live cases** (the full 8-record `poc-quilt-1` set folded at `task-c` and `task-d`).
 
