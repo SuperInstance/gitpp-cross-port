@@ -9,7 +9,12 @@
 // must not assume a build system it does not control.
 import fs from "node:fs";
 
-const modPath = process.env.HUB_BUILD || "/tmp/hub-build/fold.js";
+// Resolved at RUN time, with a RELATIVE fallback. The absolute path
+// /tmp/hub-build/fold.js exists on exactly one machine, and on that
+// machine it holds whatever was last built there -- not necessarily
+// the build under test. The hub is a SIBLING of this repository.
+const modPath = process.env.HUB_BUILD
+  || new URL("../hub/fold.js", import.meta.url).pathname;
 const { recordLeaf } = await import(modPath);
 
 const recs = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
